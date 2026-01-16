@@ -1,3 +1,4 @@
+use regex::Regex;
 use std::net::TcpListener;
 
 // `tokio::test` is the testing equivalent of `tokio::main`.
@@ -24,6 +25,39 @@ async fn health_check_works() {
     // Assert
     assert!(response.status().is_success());
     assert_eq!(Some(0), response.content_length());
+}
+
+#[tokio::test]
+async fn date_works() {
+    // Arrange
+    let address = spawn_app();
+
+    // We need to bring in `reqwest`
+    // to perform HTTP requests against our application.
+    let client = reqwest::Client::new();
+
+    // Act
+    let response = client
+        .get(format!("{}/date", address))
+        .send()
+        .await
+        .expect("Failed to execute request.");
+
+    // Assert
+    assert!(response.status().is_success());
+    let body = response
+        .text()
+        .await
+        .expect("Failed to read response body.");
+
+    let regex =
+        Regex::new(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?([+-]\d{2}:\d{2}|Z)$").unwrap();
+
+    assert!(
+        regex.is_match(&body),
+        "Body '{}' does not match RFC3339 format",
+        body
+    );
 }
 
 // No .await call, therefore no need for `spawn_app` to be async now.
