@@ -2,11 +2,11 @@ use actix_web::{HttpResponse, web};
 use serde::Deserialize;
 
 #[derive(Deserialize)]
-pub struct Subsciption {
+pub struct Subscription {
     name: String,
     email: String,
 }
 
-pub async fn subscribe(_: web::Form<Subsciption>) -> HttpResponse {
+pub async fn subscribe(_: web::Form<Subscription>) -> HttpResponse {
     HttpResponse::Ok().finish()
 }
