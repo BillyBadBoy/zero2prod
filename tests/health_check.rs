@@ -1,7 +1,11 @@
 use regex::Regex;
-use sqlx::PgPool;
+use sqlx::{Connection, Executor, PgConnection, PgPool};
 use std::net::TcpListener;
-use zero2prod::{self, config::get_configuration};
+use uuid::Uuid;
+use zero2prod::{
+    self,
+    config::{DatabaseSettings, get_configuration},
+};
 
 pub struct TestApp {
     pub address: String,
@@ -130,7 +134,11 @@ async fn subscribe_returns_a_400_when_data_is_missing() {
 async fn spawn_app() -> TestApp {
     let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind random port");
     let port = &listener.local_addr().unwrap().port();
-    let db_pool = get_db_pool().await;
+
+    let mut config = get_configuration().expect("Failed to read configuration");
+    // choose a random DB name
+    config.database.database_name = Uuid::new_v4().to_string();
+    let db_pool = configure_database(&config.database).await;
 
     let server =
         zero2prod::startup::run(listener, db_pool.clone()).expect("Failed to bind address");
@@ -143,10 +151,33 @@ async fn spawn_app() -> TestApp {
     TestApp { address, db_pool }
 }
 
-async fn get_db_pool() -> PgPool {
-    let configuration = get_configuration().expect("Failed to read configuration");
-    let connection_string = configuration.database.connection_string();
-    PgPool::connect(&connection_string)
+pub async fn configure_database(config: &DatabaseSettings) -> PgPool {
+    // Create database
+    let maintenance_settings = DatabaseSettings {
+        database_name: "postgres".to_string(),
+        username: "postgres".to_string(),
+        password: "password".to_string(),
+        ..config.clone()
+    };
+
+    let mut connection = PgConnection::connect(&maintenance_settings.connection_string())
         .await
-        .expect("Failed to connect to Postgres.")
+        .expect("Failed to connect to Postgres");
+
+    connection
+        .execute(format!(r#"CREATE DATABASE "{}";"#, config.database_name).as_str())
+        .await
+        .expect("Failed to create database.");
+
+    // Migrate database
+    let connection_pool = PgPool::connect(&config.connection_string())
+        .await
+        .expect("Failed to connect to Postgres.");
+
+    sqlx::migrate!("./migrations")
+        .run(&connection_pool)
+        .await
+        .expect("Failed to migrate the database");
+
+    connection_pool
 }
