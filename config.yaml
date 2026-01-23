@@ -1,0 +1,10 @@
+# Example configuration for zero2prod
+
+database:
+  username: "postgres"
+  password: "password"
+  port: 5432
+  host: "localhost"
+  database_name: "newsletter"
+
+application_port: 8000
