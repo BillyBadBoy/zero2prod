@@ -42,7 +42,7 @@ pub async fn subscribe(form: web::Form<Subscription>, db_pool: web::Data<PgPool>
     // `.instrument` takes care of it at the right moments
     // in the query future lifetime
     let query_span = tracing::info_span!("Saving new subscriber details in the database");
-    let result = sqlx::query!(
+    match sqlx::query!(
         r#"
         INSERT INTO subscriptions (id, email, name, subscribed_at)
         VALUES ($1, $2, $3, $4)
@@ -55,9 +55,8 @@ pub async fn subscribe(form: web::Form<Subscription>, db_pool: web::Data<PgPool>
     .execute(db_pool.get_ref())
     // First we attach the instrumentation, then we `.await` it
     .instrument(query_span)
-    .await;
-
-    match result {
+    .await
+    {
         Ok(_) => {
             tracing::info!("New subscriber details have been saved");
             HttpResponse::Ok().finish()
