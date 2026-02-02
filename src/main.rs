@@ -2,15 +2,20 @@ use sqlx::PgPool;
 use std::net::TcpListener;
 use tracing::subscriber::set_global_default;
 use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
+use tracing_log::LogTracer;
 use tracing_subscriber::{EnvFilter, Registry, layer::SubscriberExt};
 use zero2prod::config::{Settings, get_configuration};
 use zero2prod::startup::run;
 
 #[tokio::main]
 async fn main() -> Result<(), std::io::Error> {
+    // Redirect all `log`'s events to our subscriber
+    LogTracer::init().expect("Failed to set logger");
+
     // We are falling back to printing all spans at info-level or above
     // if the RUST_LOG environment variable has not been set.
     let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+
     let formatting_layer = BunyanFormattingLayer::new(
         "zero2prod".into(),
         // Output the formatted spans to stdout.
@@ -40,7 +45,6 @@ fn build_listener(config: &Settings) -> TcpListener {
 
 async fn build_db_connection(config: &Settings) -> PgPool {
     let connection_string = config.database.connection_string();
-    PgPool::connect(&connection_string)
-        .await
+    PgPool::connect_lazy(&connection_string)
         .expect("Failed to connect to Postgres.")
 }
