@@ -39,12 +39,11 @@ async fn main() -> Result<(), std::io::Error> {
 }
 
 fn build_listener(config: &Settings) -> TcpListener {
-    let address = format!("127.0.0.1:{}", config.application_port);
+    let address = format!("{}:{}", config.application.host, config.application.port);
     TcpListener::bind(address).expect("Failed to bind port")
 }
 
 async fn build_db_connection(config: &Settings) -> PgPool {
     let connection_string = config.database.connection_string();
-    PgPool::connect_lazy(&connection_string)
-        .expect("Failed to connect to Postgres.")
+    PgPool::connect_lazy(&connection_string).expect("Failed to connect to Postgres.")
 }
